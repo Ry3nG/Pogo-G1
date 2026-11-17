@@ -1,0 +1,4 @@
+# Capped exploration.
+step-maxstd 0 steer_timescale="step" --max-std=0.25
+step-maxstd 1 steer_timescale="step" --max-std=0.25
+step-maxstd 2 steer_timescale="step" --max-std=0.25

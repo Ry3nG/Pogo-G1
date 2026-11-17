@@ -1,0 +1,159 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD-->
+<style>
+  .key { display: flex; align-items: center; gap: 9px; height: 18px; margin: 0 0 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .key i { display: inline-block; width: 12px; margin-right: 4px; vertical-align: middle; }
+  .key .math { font-size: 13px; }
+  .key sub { font-size: 12px; line-height: 0; }
+  .gap { height: 8px; }
+</style></head>
+<body>
+<div class="fig" data-size="602x236" style="height:236px">
+  <div class="row" style="grid-template-columns: 214px 200px 144px">
+    <div class="panel">
+      <h2><b>a</b>Yaw rate, sampled actions</h2>
+      <div class="key">
+        <span style="color:var(--per-step)"><i style="background:var(--per-step);height:1px"></i>pelvis</span>
+        <span style="color:var(--per-hop)"><i style="background:var(--per-hop);height:2.6px"></i>hop average</span>
+        <span style="color:var(--momentum)"><i style="background:var(--momentum);height:1.8px"></i><span class="math">L<sub>z</sub></span>&#8202;/&#8202;<span class="math">I<sub>zz</sub></span></span>
+      </div>
+      <div id="a"></div>
+    </div>
+    <div class="panel">
+      <h2><b>b</b>Steps within tolerance</h2>
+      <div class="key" id="bkey" style="position:relative"></div>
+      <div id="b1"></div>
+      <div class="gap"></div>
+      <div id="b2"></div>
+    </div>
+    <div class="panel">
+      <h2><b>c</b>Expected reward</h2>
+      <div class="key" id="ckey"></div>
+      <div id="c"></div>
+    </div>
+  </div>
+</div>
+<script>
+/*DATA*/
+const css = getComputedStyle(document.documentElement);
+const v = (k) => css.getPropertyValue(k).trim();
+const FS = 12;
+const style = {fontFamily: "Source Sans 3", fontSize: FS + "px", color: v("--muted"), overflow: "visible"};
+const C = DATA.command, S = DATA.tolerance;
+const minus = (d) => (d < 0 ? "−" : "") + Math.abs(d);
+const COL = {pelvis: v("--per-step"), momentum: v("--momentum")};
+// command +- tolerance: a light ink band (style token if defined) with the command as a solid thin ink line
+const TARGET = v("--target") || "rgba(29, 36, 51, 0.16)";
+const INK = v("--ink");
+const MB = 42, LO = 36;      // bottom margin and axis-title offset: titles clear of 12 px ticks
+const HA = 190;              // a and c plot height; b's rows are sized so all three x axes share one baseline
+const ytitle = (x, y, s) => Plot.text([0], {x, y, text: () => s, textAnchor: "start", lineAnchor: "bottom", dy: -5, fill: v("--muted"), fontSize: FS});
+
+// a: one world, three hops
+const T = DATA.hops[2][1];
+const series = (ys) => DATA.t.map((t, i) => ({t, y: ys[i]})).filter((d) => d.t <= T + 1e-9);
+const clip = (h) => ({x1: Math.max(h[0], 0), x2: Math.min(h[1], T), y: h[2]});
+const hopAvg = DATA.hops.filter((h) => h[0] < T - 0.05).map(clip);
+const YA = [-3, 4.3];
+document.getElementById("a").append(Plot.plot({
+  width: 214, height: HA, marginLeft: 26, marginRight: 4, marginTop: 18, marginBottom: MB, style,
+  x: {domain: [0, T], label: "time (s)", labelAnchor: "center", labelArrow: "none", labelOffset: LO, ticks: [0, 0.5, 1, 1.5], tickFormat: (d) => d ? String(d) : "0", tickSize: 3},
+  y: {domain: YA, label: null, ticks: [-2, 0, 2, 4], tickFormat: minus, tickSize: 0},
+  marks: [
+    Plot.ruleY([0], {stroke: v("--rule")}),
+    Plot.rect([0], {x1: 0, x2: T, y1: C - S, y2: C + S, fill: TARGET}),
+    Plot.ruleY([C], {stroke: INK, strokeWidth: 0.8}),
+    Plot.line(series(DATA.pelvis), {x: "t", y: "y", stroke: COL.pelvis, strokeWidth: 1, curve: "monotone-x"}),
+    Plot.line(series(DATA.momentum), {x: "t", y: "y", stroke: COL.momentum, strokeWidth: 1.8, curve: "monotone-x"}),
+    Plot.link(hopAvg, {x1: "x1", x2: "x2", y1: "y", y2: "y", stroke: "white", strokeWidth: 4.6, strokeLinecap: "round"}),
+    Plot.link(hopAvg, {x1: "x1", x2: "x2", y1: "y", y2: "y", stroke: v("--per-hop"), strokeWidth: 2.6, strokeLinecap: "round"}),
+    ytitle(0, YA[1], "yaw rate (rad/s)"),
+  ],
+}));
+
+// b: histograms of the per-step yaw rate, turning (up) and hopping in place (down), on the 0.5 rad/s band
+const H = DATA.hist, BW = H.bin, XB = [H.lo, H.hi];
+const inBand = (b) => b.x1 >= C - S - 1e-6 && b.x2 <= C + S + 1e-6;
+const bins = (sig, cs, sgn) => H[sig][cs].counts.map((n, i) => ({x1: H.lo + i * BW, x2: H.lo + (i + 1) * BW, y: sgn * n / H[sig][cs].n / BW}));
+const pct = (f) => (f * 100).toFixed(1) + "%";
+const WB = 200, RH = 70;
+const row = (sig, name, last) => {
+  const up = bins(sig, "turning", 1), dn = bins(sig, "in_place", -1);
+  const peak = Math.max(...up.map((b) => b.y), ...dn.map((b) => -b.y)) / 0.6;
+  const lo = last ? -peak * 1.08 : -peak;  // last row: room between "in place" share and the ticks
+  return Plot.plot({
+    width: WB, height: RH + (last ? MB : 0), marginLeft: 4, marginRight: 4, marginTop: 0, marginBottom: last ? MB : 0, style,
+    x: {domain: XB, label: last ? "yaw rate (rad/s)" : null, labelAnchor: "center", labelArrow: "none", labelOffset: LO,
+        ticks: last ? [-2, 0, 2, 4] : [], tickFormat: (d) => d ? minus(d) : "0", tickSize: 3, axis: last ? "bottom" : null},
+    y: {domain: [lo, peak], axis: null},
+    marks: [
+      Plot.rect([0], {x1: C - S, x2: C + S, y1: lo, y2: peak, fill: TARGET}),
+      Plot.rectY([...up, ...dn], {x1: "x1", x2: "x2", y1: 0, y2: "y", fill: COL[sig], fillOpacity: (b) => inBand(b) ? 1 : 0.28, inset: 0}),
+      Plot.ruleY([0], {stroke: "white", strokeWidth: 1}),
+      Plot.ruleX([C], {y1: lo, y2: peak, stroke: INK, strokeWidth: 0.8}),
+      Plot.text([H[sig].turning.inside], {x: C + S, y: peak, text: pct, textAnchor: "start", lineAnchor: "top", dx: 3, fill: COL[sig], fontSize: FS, fontWeight: 600}),
+      Plot.text([H[sig].in_place.inside], {x: C + S, y: -peak, text: pct, textAnchor: "start", lineAnchor: "bottom", dx: 3, fill: COL[sig], fontSize: FS, fontWeight: 600}),
+      Plot.text([name], {x: XB[0], y: peak, text: (d) => d, textAnchor: "start", lineAnchor: "top", fill: COL[sig], fontSize: FS, fontWeight: 600}),
+      Plot.text(last ? [] : ["turning"], {x: XB[0], y: peak * 0.45, text: (d) => d, textAnchor: "start", fill: v("--muted"), fontSize: FS}),
+      Plot.text(last ? [] : ["in place"], {x: XB[0], y: -peak * 0.45, text: (d) => d, textAnchor: "start", fill: v("--muted"), fontSize: FS}),
+    ],
+  });
+};
+document.getElementById("b1").append(row("pelvis", "pelvis", false));
+document.getElementById("b2").append(row("momentum", "Lz/Izz", true));
+{ const xb = (x) => 4 + (x - XB[0]) / (XB[1] - XB[0]) * (WB - 8);
+  const e = document.createElement("span"); e.textContent = "0.5 ± 0.15 rad/s";
+  Object.assign(e.style, {position: "absolute", left: xb(C) + "px", bottom: "-2px", transform: "translateX(-50%)", color: v("--text"), fontWeight: 400});
+  document.getElementById("bkey").append(e); }
+
+// c: expected per-step reward E[k(mu - c + xi)], xi ~ N(0, sigma^2), against the mean yaw rate mu.
+// Exact Gaussian expectation, integrated as in fig_data.py (trapezoid, 2401 points over +-6 sigma).
+const kernel = (e) => 1 / (1 + (e / S) ** 2);
+const XI = d3.range(2401).map((i) => -6 + 12 * i / 2400), PDF = XI.map((z) => Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI));
+const expect = (mu, sig) => { let s = 0; for (let i = 1; i < XI.length; i++) {
+  const a = kernel(mu - C + sig * XI[i - 1]) * PDF[i - 1], b = kernel(mu - C + sig * XI[i]) * PDF[i]; s += (a + b) / 2 * (XI[i] - XI[i - 1]); } return s; };
+const SIG = {momentum: DATA.spread.momentum_sampled, pelvis: DATA.spread.pelvis_sampled};
+const XC = [-0.8, 1.3], grid = d3.range(XC[0], XC[1] + 1e-9, 0.01);
+const curves = Object.entries(SIG).flatMap(([k, sig]) => grid.map((x) => ({k, x, r: expect(x, sig)})));
+const kern = grid.map((x) => ({x, r: kernel(x - C)}));
+const pts = Object.entries(SIG).flatMap(([k, sig]) => [0, C].map((x) => ({k, x, r: expect(x, sig)})));
+const gain = Object.entries(SIG).map(([k, sig]) => ({k, r0: expect(0, sig), r1: expect(C, sig)}));
+const fmtGain = (g) => "+" + (g < 0.05 ? g.toFixed(4) : g.toFixed(2));
+document.getElementById("c").append(Plot.plot({
+  width: 144, height: HA, marginLeft: 24, marginRight: 4, marginTop: 18, marginBottom: MB, style,
+  x: {domain: XC, label: "mean yaw rate (rad/s)", labelAnchor: "center", labelArrow: "none", labelOffset: LO, ticks: [0, 0.5, 1], tickFormat: (d) => d ? String(d) : "0", tickSize: 3},
+  y: {domain: [0, 1], label: null, ticks: [0, 0.5, 1], tickFormat: (d) => d ? String(d) : "0", tickSize: 0, grid: true},
+  marks: [
+    Plot.rect([0], {x1: C - S, x2: C + S, y1: 0, y2: 1, fill: TARGET}),
+    Plot.ruleX([C], {stroke: INK, strokeWidth: 0.8}),
+    Plot.line(kern, {x: "x", y: "r", stroke: v("--neutral"), strokeWidth: 1.2}),
+    Plot.line(curves, {x: "x", y: "r", z: "k", stroke: (d) => COL[d.k], strokeWidth: 1.8}),
+    // the reward gained by turning: the turning level carried back to the in-place dot
+    Plot.link(gain, {x1: 0, x2: C, y1: "r1", y2: "r1", stroke: (d) => COL[d.k], strokeWidth: 0.8, strokeOpacity: 0.7}),
+    Plot.link(gain, {x1: 0, x2: 0, y1: "r0", y2: "r1", stroke: (d) => COL[d.k], strokeWidth: 1.6}),
+    Plot.dot(pts, {x: "x", y: "r", r: 3, fill: (d) => COL[d.k], stroke: "white", strokeWidth: 0.75}),
+    Plot.text(gain.filter((d) => d.k === "momentum"), {x: 0, y: (d) => (d.r0 + d.r1) / 2, text: (d) => fmtGain(d.r1 - d.r0),
+      textAnchor: "end", dx: -4, fill: COL.momentum, fontSize: FS, fontWeight: 600}),
+    Plot.text(gain.filter((d) => d.k === "pelvis"), {x: 0, y: (d) => d.r1, text: (d) => fmtGain(d.r1 - d.r0),
+      textAnchor: "end", lineAnchor: "bottom", dx: -4, dy: -6, fill: COL.pelvis, fontSize: FS, fontWeight: 600}),
+    ytitle(XC[0], 1, "expected reward"),
+  ],
+}));
+{ const k = document.getElementById("ckey");
+  k.innerHTML = `<span style="color:var(--muted)"><i style="all:unset;font-style:italic;font-weight:400">σ</i> = 0</span>`
+    + `<span style="color:var(--momentum)">${SIG.momentum.toFixed(2)}</span><span style="color:var(--per-step)">${SIG.pelvis.toFixed(2)}</span>`; }
+
+// typeset "Lz/Izz" in SVG labels as the text's math: italic L, I with subscripts (no glyph below 12 px)
+document.querySelectorAll("svg text").forEach((t) => {
+  if (!t.textContent.includes("Lz/Izz")) return;
+  const [pre, post] = t.textContent.split("Lz/Izz");
+  const ns = "http://www.w3.org/2000/svg", span = (txt, attrs = {}) => {
+    const e = document.createElementNS(ns, "tspan"); e.textContent = txt;
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+  const it = {"font-family": "LM Roman", "font-style": "italic", "font-weight": 400}, sub = {...it, "font-size": "12px", dy: "3"};
+  t.textContent = "";
+  t.append(span(pre), span("L", {...it, "font-size": "13px"}), span("z", sub), span("/", {dy: "-3", "font-weight": 400, "font-size": "13px", "font-family": "LM Roman"}),
+    span("I", {...it, "font-size": "13px"}), span("zz", sub), span(post, {dy: "-3"}));
+});
+</script>
+</body></html>

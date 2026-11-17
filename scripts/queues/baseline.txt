@@ -1,0 +1,5 @@
+# The recipe (TaskCfg defaults), three seeds. Run with UPDATES=4000 for the
+# report's comparisons; seeds 0 and 1 were also trained to 20000 updates.
+vel-obs 0
+vel-obs 1
+vel-obs 2

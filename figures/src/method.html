@@ -1,0 +1,158 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD-->
+<style>
+  .fig { position: relative; }
+  .fig > svg { position: absolute; left: 0; top: 0; }
+  .t { position: absolute; white-space: nowrap; font-size: 12px; line-height: 15px; color: var(--text); }
+  .h { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .mu { color: var(--muted); }
+  .m { font-family: "LM Roman", serif; font-style: italic; font-weight: 400; font-size: 13px; }
+  .r { font-family: "LM Roman", serif; font-style: normal; font-weight: 400; font-size: 13px; }
+  .t sub, .t sup { font-size: 12px; line-height: 0; }
+  .t sub { vertical-align: -3px; }
+  .t sup { vertical-align: 5px; }
+  .crop { position: absolute; overflow: hidden; }
+  .crop img { position: absolute; display: block; }
+</style></head>
+<body>
+<div class="fig" id="fig" data-size="602x224" style="height:224px"></div>
+<script>
+/*DATA*/
+/*IMAGES*/
+// Math-italic Greek and \star from Latin Modern Math (latinmodern-math.otf, GUST Font License), which LM Roman 10
+// lacks: outlines in font units (1000 per em), y down, drawn inline as vector paths by gk() below.
+const GL = {"pi":{"d":"M567 -407C567 -431 546 -431 527 -431H192C170 -431 132 -431 88 -384C53 -345 27 -299 27 -294C27 -294 27 -284 39 -284C47 -284 49 -288 55 -296C104 -373 162 -373 182 -373H239C207 -252 153 -131 111 -40C103 -25 103 -23 103 -16C103 3 119 11 132 11C162 11 170 -17 182 -54C196 -100 196 -102 209 -152L265 -373H378C345 -225 336 -182 336 -115C336 -100 336 -73 344 -39C354 5 365 11 380 11C400 11 421 -7 421 -27C421 -33 421 -35 415 -49C386 -121 386 -186 386 -214C386 -267 393 -321 404 -373H518C531 -373 567 -373 567 -407Z","adv":570},"theta":{"d":"M455 -500C455 -566 437 -705 335 -705C196 -705 42 -423 42 -194C42 -100 71 11 162 11C303 11 455 -276 455 -500ZM389 -562C389 -513 381 -462 357 -363H148C165 -427 185 -507 225 -578C252 -627 289 -683 334 -683C383 -683 389 -619 389 -562ZM348 -331C337 -285 316 -200 278 -128C243 -60 205 -11 162 -11C129 -11 108 -40 108 -133C108 -175 114 -233 140 -331Z","adv":469},"phi":{"d":"M573 -262C573 -341 520 -433 381 -443L437 -670L440 -684C440 -684 440 -694 428 -694C418 -694 417 -691 413 -674L355 -443C196 -438 49 -305 49 -169C49 -74 119 5 241 12L218 106C206 153 196 191 196 194C196 204 203 205 208 205C213 205 215 204 218 201C220 199 226 175 229 161L267 12C428 7 573 -128 573 -262ZM349 -421 246 -10C186 -13 114 -48 114 -148C114 -268 200 -408 349 -421ZM508 -283C508 -165 422 -22 272 -10L375 -421C451 -417 508 -371 508 -283Z","adv":596},"sigma":{"d":"M567 -407C567 -431 546 -431 528 -431H300C149 -431 38 -266 38 -147C38 -59 97 11 188 11C306 11 439 -110 439 -264C439 -281 439 -329 408 -373H518C531 -373 567 -373 567 -407ZM375 -276C375 -229 355 -147 321 -96C282 -37 228 -11 189 -11C140 -11 100 -47 100 -119C100 -149 112 -231 147 -290C189 -359 249 -373 283 -373C367 -373 375 -307 375 -276Z","adv":571},"omega":{"d":"M604 -372C604 -398 599 -420 584 -433C578 -439 570 -442 561 -442C549 -442 536 -436 526 -426C517 -416 512 -405 512 -394C512 -384 516 -376 523 -369C548 -347 561 -316 561 -281C561 -269 560 -256 557 -244C534 -153 476 -61 397 -61C341 -61 308 -99 299 -151C312 -179 322 -209 329 -239C331 -248 333 -257 333 -265C333 -280 328 -291 314 -291C295 -291 285 -266 280 -244C272 -213 268 -183 267 -154C234 -100 186 -61 131 -61C70 -61 44 -111 44 -174C44 -194 47 -217 52 -239C67 -299 103 -355 141 -408C144 -412 146 -417 146 -421C146 -427 142 -432 137 -435C134 -437 131 -437 128 -437C122 -437 115 -434 110 -428C69 -371 44 -307 28 -244C18 -206 13 -167 13 -132C13 -51 42 11 118 11C181 11 233 -33 271 -95C282 -33 317 11 384 11C488 11 551 -118 581 -239C592 -282 604 -332 604 -372Z","adv":622},"star":{"d":"M497 -306C496 -309 493 -311 490 -311L287 -277L257 -480C256 -483 253 -486 250 -486C247 -486 244 -483 243 -480L213 -277L10 -311C7 -311 4 -309 3 -306C2 -303 3 -299 6 -298L190 -206L95 -24C93 -21 94 -18 97 -15C100 -13 104 -14 106 -16L250 -162L394 -16C396 -14 400 -13 403 -15C406 -18 407 -21 405 -24L310 -206L494 -298C497 -299 498 -303 497 -306Z","adv":500}};
+const css = getComputedStyle(document.documentElement);
+const v = (k) => css.getPropertyValue(k).trim();
+const INK = v("--ink"), MUTED = v("--muted"), BAND = v("--band");
+const HOP = v("--per-hop"), STEP = v("--per-step");
+const EDGE = "#d3d6db";            // outline of fixed blocks (between --rule and --neutral)
+const W = 602, H = 224;
+const fig = document.getElementById("fig");
+const ns = "http://www.w3.org/2000/svg";
+const el = (n, a, parent) => { const e = document.createElementNS(ns, n);
+  for (const [p, q] of Object.entries(a)) e.setAttribute(p, q); (parent || svg).append(e); return e; };
+const svg = el("svg", {width: W, height: H}, fig);
+
+const gk = (k, px = 13) => { const g = GL[k];
+  return `<svg width="${(g.adv * px / 1000).toFixed(2)}" height="${px}" viewBox="0 -750 ${g.adv} 1000" `
+    + `style="vertical-align:${(-0.25 * px).toFixed(2)}px;overflow:visible"><path d="${g.d}" fill="currentColor"/></svg>`; };
+const M = (s) => `<span class="m">${s}</span>`, R = (s) => `<span class="r">${s}</span>`;
+
+// labels: (x, y) is the left / centre / right end of the text's top edge
+const lab = (x, y, html, o = {}) => { const d = document.createElement("div"); d.className = "t " + (o.cls || "");
+  d.innerHTML = html; d.style.left = x + "px"; d.style.top = y + "px";
+  if (o.anchor === "middle") d.style.transform = "translateX(-50%)";
+  if (o.anchor === "end") d.style.transform = "translateX(-100%)";
+  if (o.color) d.style.color = o.color; fig.append(d); return d; };
+
+const box = (x, y, w, h, o = {}) => el("rect", {x, y, width: w, height: h, rx: o.rx ?? 7,
+  fill: o.fill || "white", stroke: o.stroke || EDGE, "stroke-width": o.sw || 1});
+// arrow along a polyline, filled head at the end
+const arrow = (pts, o = {}) => { const c = o.color || INK, sw = o.sw || 1.1, L = 6, Wd = 2.6;
+  const [x2, y2] = pts.at(-1), [x1, y1] = pts.at(-2), d = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / d, uy = (y2 - y1) / d;
+  const end = [...pts.slice(0, -1), [x2 - ux * (L - 1), y2 - uy * (L - 1)]];
+  el("polyline", {points: end.map((p) => p.join(",")).join(" "), fill: "none", stroke: c, "stroke-width": sw, "stroke-linejoin": "round"});
+  el("path", {d: `M${x2},${y2} L${x2 - ux * L - uy * Wd},${y2 - uy * L + ux * Wd} L${x2 - ux * L + uy * Wd},${y2 - uy * L - ux * Wd} Z`, fill: c}); };
+
+// MLP 512-256-128: three layers as bars of proportional height, joined by light trapezoids
+const mlp = (cx, cy, numbers) => { const hs = [26, 13, 6.5], dx = 22, bw = 5, xs = [-dx, 0, dx].map((d) => cx + d);
+  for (let i = 0; i < 2; i++) el("path", {d: `M${xs[i] + bw / 2},${cy - hs[i] / 2} L${xs[i + 1] - bw / 2},${cy - hs[i + 1] / 2} `
+    + `L${xs[i + 1] - bw / 2},${cy + hs[i + 1] / 2} L${xs[i] + bw / 2},${cy + hs[i] / 2} Z`, fill: BAND});
+  xs.forEach((x, i) => el("rect", {x: x - bw / 2, y: cy - hs[i] / 2, width: bw, height: hs[i], rx: 1.5, fill: INK}));
+  if (numbers) ["512", "256", "128"].forEach((s, i) => lab(xs[i], cy + 16, s, {anchor: "middle", cls: "mu"})); };
+
+// ---------------- layout
+const Y0 = 0, YB = 200;                      // blocks span Y0..YB; the PPO loop runs below
+const OBS = {x: 0, w: 118}, NET = {x: 142, w: 80}, PHY = {x: 314, w: 98}, REW = {x: 434, w: W - 434};
+const ACT = {y: 0, h: 90}, CRI = {y: 110, h: 90};
+const yA = ACT.y + ACT.h / 2, yC = CRI.y + CRI.h / 2;
+const PAD = 8, SK = 6;                       // padding; offset of the stacked worlds behind the physics card
+
+// observation
+box(OBS.x + 0.5, Y0 + 0.5, OBS.w - 1, YB - Y0 - 1);
+{ const x = OBS.x + PAD; let y = 6;
+  lab(x, y, `Observation ${M("o")}<sub>${M("t")}</sub>`, {cls: "h"});
+  y += 20; lab(x, y, "noisy proprioception");
+  ["gyro, accelerometer,", "gravity, 29 joints,", "previous action"].forEach((s, i) => lab(x, y + 14 * (i + 1), s, {cls: "mu"}));
+  y += 61; lab(x, y, "pelvis velocity"); lab(x, y + 14, "± 0.5 m/s noise", {cls: "mu"});
+  y += 33; lab(x, y, "command");
+  const st = gk("star", 12), ss = (b, s) => `${b}<sub>${s}</sub><sup style="margin-left:-5px">${st}</sup>`;
+  lab(x, y + 16, `${R("[")}${M("h")}<sup>${st}</sup>${R(", ")}${ss(M("v"), M("x"))}${R(", ")}${ss(M("v"), M("y"))}${R(", ")}${ss(gk("omega"), M("z"))}${R("]")}`);
+  lab(x, YB - 34, "5 frames, 0.1 s", {cls: "mu"}); lab(x, YB - 20, "515 numbers", {cls: "mu"}); }
+
+// actor and critic: the learned parts, outlined in ink
+box(NET.x + 0.6, ACT.y + 0.6, NET.w - 1.2, ACT.h - 1.2, {stroke: INK, sw: 1.2});
+lab(NET.x + PAD, ACT.y + 6, `Actor ${gk("pi", 14)}<sub>${gk("theta", 12)}</sub>`, {cls: "h"});
+mlp(NET.x + NET.w / 2, ACT.y + 50, true);
+box(NET.x + 0.6, CRI.y + 0.6, NET.w - 1.2, CRI.h - 1.2, {stroke: INK, sw: 1.2});
+lab(NET.x + PAD, CRI.y + 6, `Critic ${M("V")}<sub>${gk("phi", 12)}</sub>`, {cls: "h"});
+mlp(NET.x + NET.w / 2, CRI.y + 50, false);
+arrow([[OBS.x + OBS.w, yA], [NET.x, yA]]);
+arrow([[NET.x + NET.w / 2, CRI.y], [NET.x + NET.w / 2, ACT.y + ACT.h]], {color: MUTED});
+lab(NET.x + NET.w / 2 + 6, ACT.y + ACT.h + 2, "advantage", {cls: "mu"});
+
+// action: a Gaussian around the actor's mean, its learned sigma being PPO's exploration noise
+{ const x0 = NET.x + NET.w, x1 = PHY.x, cx = (x0 + x1) / 2 + 6, base = yA - 5, sd = 7, amp = 20;
+  const pts = d3.range(-3, 3.001, 0.1).map((z) => [cx + z * sd, base - amp * Math.exp(-z * z / 2)]);
+  el("path", {d: "M" + pts.map((p) => p.join(",")).join("L") + "Z", fill: BAND, stroke: INK, "stroke-width": 0.9});
+  el("line", {x1: cx, x2: cx, y1: base - amp, y2: base, stroke: INK, "stroke-width": 0.8});
+  el("line", {x1: cx, x2: cx + sd, y1: base - amp * 0.6, y2: base - amp * 0.6, stroke: INK, "stroke-width": 0.8});
+  lab(cx + sd + 3, base - amp * 0.6 - 13, `${gk("sigma", 13)}<sub>${M("a")}</sub>`);
+  lab(x0 + 7, base - 17, `${M("a")}<sub>${M("t")}</sub>`);
+  arrow([[x0, yA], [x1, yA]]);
+  const xm = (x0 + x1) / 2;
+  lab(xm, yA + 5, "29 PD targets", {anchor: "middle"});
+  lab(xm, yA + 20, "at 50 Hz", {anchor: "middle", cls: "mu"}); }
+
+// physics: 4096 worlds stacked
+const PW = PHY.w - SK;                        // width of the front card
+[[SK, SK], [SK / 2, SK / 2]].forEach(([dx, dy]) => box(PHY.x + 0.5 + dx, Y0 + 0.5 + dy, PW - 1, YB - Y0 - SK - 1));
+box(PHY.x + 0.5, Y0 + 0.5, PW - 1, YB - Y0 - SK - 1);
+{ const x = PHY.x + PAD;
+  lab(x, 6, "Physics", {cls: "h"}); lab(x, 26, "MuJoCo, 2 ms", {cls: "mu"}); lab(x, 40, "fixed finger grip", {cls: "mu"});
+  lab(x, YB - SK - 21, "4096 worlds", {cls: "mu"});
+  // the rider (hero render, 2000 x 3000 canvas): head at y = 181, tip at y = 2213, x 746..1215
+  const top = 58, bot = YB - SK - 24, k = (bot - top) / (2213 - 181), cx = PHY.x + PW / 2;
+  const crop = document.createElement("div"); crop.className = "crop";
+  Object.assign(crop.style, {left: cx - 40 + "px", top: top - 2 + "px", width: "80px", height: bot - top + 4 + "px"});
+  const img = document.createElement("img"); img.src = IMAGES.hero;
+  Object.assign(img.style, {width: 2000 * k + "px", height: 3000 * k + "px", left: 40 - ((746 + 1215) / 2) * k + "px", top: 2 - 181 * k + "px"});
+  crop.append(img); fig.append(crop); }
+arrow([[PHY.x, yC], [NET.x + NET.w, yC]]);
+lab((PHY.x + NET.x + NET.w) / 2, yC - 19, "privileged state", {anchor: "middle", cls: "mu"});
+lab((PHY.x + NET.x + NET.w) / 2, yC + 4, "noise-free", {anchor: "middle", cls: "mu"});
+arrow([[PHY.x + PHY.w, yA], [REW.x, yA]]);
+
+// reward
+box(REW.x + 0.5, Y0 + 0.5, REW.w - 1, YB - Y0 - 1);
+{ const x = REW.x + PAD, xr = W - PAD;
+  lab(x, 6, "Reward", {cls: "h"});
+  lab(x, 26, `${M("k")}${R("(")}${M("e")}${R(")&#8201;=&#8201;1/(1&#8201;+&#8201;(")}${M("e")}${R("/")}${M("s")}${R(")")}<sup style="vertical-align:4px">${R("2")}</sup>${R(")")}`);
+  lab(x, 46, `height: at each landing`);
+  lab(x, 62, `velocity, yaw rate:`);
+  // one hop of Fig. 1b: stance 0..0.286 s, next landing at 0.910 s; a control step every 20 ms
+  const T0 = 0.286, T = 0.91, X = (t) => x + t / (T + 0.05) * (xr - x);
+  const yt = 82, yS = 114, yH = 148, yb = 162;
+  el("rect", {x: X(0), y: yt - 1, width: X(T0) - X(0), height: yb - yt + 1, fill: BAND});
+  el("rect", {x: X(T), y: yt - 1, width: X(T + 0.05) - X(T), height: yb - yt + 1, fill: BAND});
+  lab(X(0) + 3, yt, "stance", {cls: "mu"}); lab(X(T0) + 3, yt, "flight", {cls: "mu"});
+  lab(X(0) + 3, yS - 16, "per step", {cls: "h", color: STEP}).style.fontSize = "12px";
+  lab(X(T) - 5, yS - 16, "every 20 ms", {anchor: "end", color: STEP});
+  for (let t = 0.02; t <= T + 1e-9; t += 0.02) el("line", {x1: X(t), x2: X(t), y1: yS + 2, y2: yS + 10, stroke: STEP, "stroke-width": 1.1});
+  lab(X(0) + 3, yH - 16, "per hop", {cls: "h", color: HOP}).style.fontSize = "12px";
+  lab(X(T) - 5, yH - 16, "hop average", {anchor: "end", color: HOP});
+  el("line", {x1: X(0), x2: X(T), y1: yH + 6, y2: yH + 6, stroke: HOP, "stroke-width": 1.8});
+  el("rect", {x: X(T) - 1.5, y: yH - 2, width: 3, height: 16, rx: 1, fill: HOP});
+  lab(X(T) + 1.5, yb + 1, "landing", {anchor: "end", cls: "mu"});   // ends at the payment bar, inside the panel
+  lab(x, YB - 21, "+ shared guides, penalties", {cls: "mu"}); }
+
+// PPO: from the reward back to the networks
+{ const yL = H - 10, xr = REW.x + REW.w / 2, xn = NET.x + NET.w / 2;
+  el("polyline", {points: `${xr},${YB} ${xr},${yL} ${xn},${yL}`, fill: "none", stroke: MUTED, "stroke-width": 1.1});
+  arrow([[xn, yL], [xn, CRI.y + CRI.h]], {color: MUTED});
+  const px = (xn + xr) / 2;
+  el("rect", {x: px - 40, y: yL - 9, width: 80, height: 18, rx: 9, fill: "white", stroke: MUTED, "stroke-width": 1});
+  lab(px, yL - 8, "PPO update", {anchor: "middle", cls: "h"}).style.fontSize = "12px"; }
+</script>
+</body></html>

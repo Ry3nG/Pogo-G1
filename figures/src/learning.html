@@ -1,0 +1,181 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD-->
+<style>
+  .key { font-size: 12px; color: var(--muted); white-space: nowrap; height: 16px; display: flex; gap: 14px; align-items: center; }
+  .slot { height: 16px; }
+</style></head>
+<body>
+<div class="fig" data-size="602x264" style="height:264px">
+  <div class="row" style="grid-template-columns: 140px 284px 160px; column-gap: 9px">
+    <div class="panel">
+      <h2><b>a</b>Learning to turn</h2>
+      <div id="a"></div>
+    </div>
+    <div class="panel">
+      <h2><b>b</b>Fluctuation σ</h2>
+      <div class="key" id="key"></div>
+      <div id="b"></div>
+    </div>
+    <div class="panel">
+      <h2><b>c</b>Updates to hold the turn</h2>
+      <div class="slot"></div>
+      <div id="c"></div>
+    </div>
+  </div>
+</div>
+<script>
+/*DATA*/
+const css = getComputedStyle(document.documentElement);
+const v = (k) => css.getPropertyValue(k).trim();
+const FS = 12;
+const style = {fontFamily: "Source Sans 3", fontSize: FS + "px", color: v("--muted"), overflow: "visible"};
+const COL = {"per hop": v("--per-hop"), "per step": v("--per-step"), "moving average": v("--window"), "momentum": v("--momentum")};
+const INK = v("--ink"), MUTED = v("--muted"), RULE = v("--rule"), NEUTRAL = v("--neutral");
+const TOL = DATA.tolerance, CMD = DATA.command;
+const LO = 34, MB = 40;                        // x-title offset and bottom margin (titles clear of 12 px ticks)
+const axisX = (o) => ({labelAnchor: "center", labelArrow: "none", labelOffset: LO, tickSize: 3, ...o});
+
+// ---------- b and c share rows: pogo rows by fluctuation (largest first), walking apart below
+const P = 15, TOP = 16, GAP = 18;              // row pitch; header line; gap with the walking heading
+const show = DATA.conditions.filter((c) => c.plot !== false);
+const drawn = (c) => c.sigma.filter((m) => m.plot !== false);
+const ranges = (c) => drawn(c).filter((m) => m.at == null);                                   // capsules
+const traj = (c) => drawn(c).filter((m) => m.at != null).sort((p, q) => p.at - q.at);         // one run over updates
+const gm = (c) => { const s = ranges(c).length ? ranges(c) : drawn(c);
+  return Math.exp(s.reduce((a, m) => a + Math.log(m.lo * m.hi) / 2, 0) / s.length); };
+const pogo = show.filter((c) => c.task === "pogo").sort((p, q) => gm(q) - gm(p));
+const walk = show.filter((c) => c.task === "walking").sort((p, q) => gm(q) - gm(p));
+const rows = [...pogo.map((c, i) => ({c, y: TOP + P * (i + 0.5)})),
+              ...walk.map((c, i) => ({c, y: TOP + P * pogo.length + GAP + P * (i + 0.5)}))];
+const HB = TOP + P * (pogo.length + walk.length) + GAP + 4;
+const yb = {domain: [0, HB], range: [0, HB], axis: null};
+const BLOCKS = [[TOP, TOP + P * pogo.length + 2], [TOP + P * pogo.length + GAP - 2, HB]];
+const col = (c) => COL[c.family];
+const H = HB + MB;                             // plot height shared by a, b and c (b and c sit under a 16 px key line)
+
+// ---------- a: hop-averaged yaw error at +-0.5 rad/s during training (per step against per hop is Fig. 1c)
+const A = [["per hop", "per hop", "per hop"], ["window 0.5 s", "moving average", "0.5 s average"], ["momentum", "momentum", "momentum"]];
+const famOf = Object.fromEntries(A.map(([c, f]) => [c, f]));
+const curves = DATA.curves.filter((r) => famOf[r.condition]);
+const mean = A.flatMap(([c]) => {
+  const rs = curves.filter((r) => r.condition === c);
+  return [...new Set(rs.map((r) => r.iter))].sort((p, q) => p - q).map((it) => {
+    const ys = rs.filter((r) => r.iter === it).map((r) => r.yaw);
+    return {condition: c, iter: it, yaw: ys.reduce((p, q) => p + q, 0) / ys.length};
+  });
+});
+const YA = [0, 0.78];
+document.getElementById("a").append(Plot.plot({
+  width: 140, height: H + 16, marginLeft: 31, marginRight: 4, marginTop: 16 + TOP, marginBottom: MB, style,
+  x: axisX({domain: [500, 4000], label: "PPO updates", ticks: [1000, 2000, 3000, 4000], tickFormat: (d) => d / 1000 + "k"}),
+  y: {domain: YA, label: null, ticks: [0, 0.15, 0.3, 0.45, 0.6], tickFormat: (d) => d ? d.toFixed(2) : "0", tickSize: 0, grid: true},
+  marks: [
+    Plot.ruleY([0.5], {stroke: NEUTRAL, strokeWidth: 1, strokeDasharray: "1,2.5", strokeLinecap: "round"}),
+    Plot.text([0], {x: () => 4000, y: () => 0.5, text: () => "no turn", textAnchor: "end", lineAnchor: "top", dy: 3, fill: MUTED, fontSize: FS}),
+    Plot.ruleY([TOL], {stroke: INK, strokeWidth: 0.8, strokeDasharray: "3,3"}),
+    Plot.text([0], {x: () => 4000, y: () => TOL, text: () => "tolerance", textAnchor: "end", lineAnchor: "bottom", dy: -3, fill: INK, fontSize: FS}),
+    Plot.line(curves, {x: "iter", y: "yaw", z: (d) => d.condition + d.seed, stroke: (d) => COL[famOf[d.condition]], strokeWidth: 1, strokeOpacity: 0.38}),
+    Plot.line(mean, {x: "iter", y: "yaw", z: "condition", stroke: (d) => COL[famOf[d.condition]], strokeWidth: 2}),
+    // series names, stacked in the empty top right above the no-turn line
+    Plot.text(A, {x: () => 4000, y: (d, i) => YA[1] - 0.005 - i * 0.068, text: (d) => d[2], fill: (d) => COL[d[1]],
+      fontSize: FS, fontWeight: 600, textAnchor: "end", lineAnchor: "top"}),
+    Plot.text([0], {x: () => 500, y: () => YA[1], text: () => "yaw error (rad/s)", textAnchor: "start", lineAnchor: "bottom",
+      dx: -29, dy: -TOP + 2, fill: MUTED, fontSize: FS}),
+  ],
+}));
+
+// ---------- b: fluctuation sigma of the scored yaw quantity under sampled actions (log), one row per condition.
+// Filled capsules: the learner's own rollouts; open: a reference policy. A capsule spans the values over the seeds and
+// checkpoints measured. Overlapping capsules of one row stack (reference above, own below); apart ones share the line,
+// joined. A run measured at successive updates (raised weight) is an arrow in update order, white inside its capsule.
+const XS = [0.045, 1.6];
+const PADL = 0.05, lg = Math.log10, apart = (a, b) => lg(a.lo) - PADL > lg(b.hi) || lg(b.lo) - PADL > lg(a.hi);
+rows.forEach((r) => (r.stack = ranges(r.c).some((a, i) => ranges(r.c).some((b, j) => i < j && !apart(a, b)))));
+const sig = rows.flatMap((r) => ranges(r.c).map((m) => ({r, m,
+  y: r.stack ? r.y + (m.rollouts === "own" ? 3 : -3) : r.y, w: r.stack ? 5 : 7})));
+const joins = rows.filter((r) => ranges(r.c).length > 1 && !r.stack).flatMap((r) => {
+  const s = [...ranges(r.c)].sort((p, q) => p.lo - q.lo);
+  return s.slice(1).map((m, i) => ({r, a: s[i], b: m}));
+});
+const runs1 = rows.filter((r) => traj(r.c).length > 1).map((r) => {
+  const t = traj(r.c), cap = ranges(r.c).find((m) => m.lo <= t[0].lo && m.hi >= t.at(-1).hi);
+  return {r, t, cap, lo: Math.min(t[0].lo, cap?.lo ?? Infinity), hi: Math.max(t.at(-1).hi, cap?.hi ?? 0)};
+});
+const capsule = (data, core) => Plot.link(data, {x1: (d) => d.m.lo, x2: (d) => d.m.hi, y1: "y", y2: "y",
+  stroke: (d) => core ? "white" : col(d.r.c), strokeWidth: (d) => core ? d.w - 3 : d.w, strokeLinecap: "round"});
+const own = sig.filter((d) => d.m.rollouts === "own"), ref = sig.filter((d) => d.m.rollouts !== "own");
+document.getElementById("key").innerHTML = [["own", "learner's own rollouts"], ["ref", "reference policy (walking)"]].map(([k, t]) =>
+  `<span><svg width="18" height="8" style="vertical-align:-0.5px; margin-right:5px; overflow:visible"><line x1="4" x2="14" y1="4" y2="4"
+   stroke="${MUTED}" stroke-width="7" stroke-linecap="round"/>${k === "own" ? "" : `<line x1="4" x2="14" y1="4" y2="4" stroke="white"
+   stroke-width="4" stroke-linecap="round"/>`}</svg>${t}</span>`).join("");
+const ML = 104, pxf = (n) => 10 ** (n * lg(XS[1] / XS[0]) / (284 - ML - 4));   // n px as a factor on the log axis
+document.getElementById("b").append(Plot.plot({
+  width: 284, height: H, marginLeft: ML, marginRight: 4, marginTop: 0, marginBottom: MB, style,
+  x: {type: "log", domain: XS, ...axisX({label: "fluctuation σ (rad/s)", ticks: [0.05, 0.1, 0.2, 0.5, 1], tickFormat: (d) => String(d)})},
+  y: yb,
+  marks: [
+    Plot.ruleY(rows, {y: "y", x1: XS[0], x2: XS[1], stroke: RULE, strokeWidth: 0.6}),
+    Plot.ruleX(BLOCKS, {x: () => TOL, y1: (d) => d[0], y2: (d) => d[1], stroke: INK, strokeWidth: 0.8, strokeDasharray: "3,3"}),
+    Plot.ruleX(BLOCKS, {x: () => CMD, y1: (d) => d[0], y2: (d) => d[1], stroke: INK, strokeWidth: 0.8}),
+    Plot.text([0], {x: () => TOL, y: () => TOP, text: () => "tolerance", textAnchor: "end", lineAnchor: "bottom", dx: -3, dy: -1, fill: INK, fontSize: FS}),
+    Plot.text([0], {x: () => CMD, y: () => TOP, text: () => "command", textAnchor: "start", lineAnchor: "bottom", dx: 3, dy: -1, fill: INK, fontSize: FS}),
+    Plot.link(joins, {x1: (d) => d.a.hi, x2: (d) => d.b.lo, y1: (d) => d.r.y, y2: (d) => d.r.y, stroke: (d) => col(d.r.c), strokeWidth: 1, inset: 5}),
+    capsule(ref, false), capsule(ref, true), capsule(own, false),
+    // one run over updates: an arrow from its first to its last measurement, the end points labelled outside the capsule
+    Plot.dot(runs1.filter((d) => !d.cap).flatMap((d) => d.t.map((m) => ({d, m}))), {x: (e) => e.m.lo, y: (e) => e.d.r.y, r: 3.5, fill: (e) => col(e.d.r.c)}),
+    Plot.link(runs1, {x1: (d) => d.t[0].lo * pxf(5), x2: (d) => d.t.at(-1).lo / pxf(6), y1: (d) => d.r.y, y2: (d) => d.r.y,
+      stroke: (d) => d.cap ? "white" : col(d.r.c), strokeWidth: 1.2, markerEnd: "arrow"}),
+    Plot.text(runs1, {x: "lo", y: (d) => d.r.y, text: (d) => d.t[0].mark, fill: (d) => col(d.r.c), fontSize: FS, textAnchor: "end", dx: -7}),
+    Plot.text(runs1, {x: "hi", y: (d) => d.r.y, text: (d) => d.t.at(-1).mark, fill: (d) => col(d.r.c), fontSize: FS, textAnchor: "start", dx: 7}),
+    Plot.text(rows, {x: () => XS[0], y: "y", text: (d) => d.c.label, textAnchor: "end", dx: -6, fill: (d) => col(d.c), fontSize: FS, fontWeight: 600}),
+    Plot.text([0], {x: () => XS[0], y: () => BLOCKS[1][0] - 7, text: () => "G1 walking", textAnchor: "end", dx: -6, fill: INK, fontSize: FS, fontWeight: 600}),
+  ],
+}));
+
+// row labels written "σ_a": σ in the math face with a subscript a (subscript kept at 12 px, the figure minimum)
+document.querySelectorAll("#b text").forEach((t) => {
+  const m = t.textContent.match(/^(.*)σ_a(.*)$/);
+  if (!m) return;
+  const ns = "http://www.w3.org/2000/svg", span = (txt, attrs) => {
+    const e = document.createElementNS(ns, "tspan"); e.textContent = txt;
+    Object.entries(attrs).forEach(([k, val]) => e.setAttribute(k, val)); return e; };
+  const math = 'font-family:"LM Roman",serif; font-style:italic; font-weight:400';
+  t.textContent = "";
+  t.append(span(m[1], {}), span("σ", {style: math + "; font-size:14px"}),
+    span("a", {style: math + "; font-size:12px", dy: "3"}), span(m[2], {dy: "-3"}));
+});
+
+// ---------- c: update from which each run holds the turn; runs not held within their budget sit in the
+// grey band, in a column per budget (4000 updates; 12,000 for two further per-step runs trained from scratch)
+const XH = 3300, X0 = 0;                       // held runs: 500-3000 on a linear axis
+const BW = 58, BG = 8, WC = 160, MLc = 6, MRc = 2;
+const PW = WC - MLc - MRc, HW = PW - BW - BG;  // plot, held-region and band widths (px)
+const xu = (u) => MLc + (u - X0) / (XH - X0) * HW;
+const BX = MLc + HW + BG, COLS = {4000: BX + BW * 0.28, 12000: BX + BW * 0.75}, DX = 6.5;
+const runs = rows.flatMap((r) => {
+  const n = {}, k = {}, key = (s) => s.held ?? "nh" + s.budget;
+  r.c.runs.forEach((s) => (n[key(s)] = (n[key(s)] ?? 0) + 1));
+  return r.c.runs.map((s) => {
+    const j = (k[key(s)] = (k[key(s)] ?? -1) + 1), o = j - (n[key(s)] - 1) / 2;
+    // equal held values stack vertically, so x stays exact; runs not held sit side by side in their column
+    return s.held != null ? {r, x: xu(s.held), y: r.y + o * 4.6} : {r, x: COLS[s.budget] + o * DX, y: r.y};
+  });
+});
+const px = {type: "identity"};
+document.getElementById("c").append(Plot.plot({
+  width: WC, height: H, marginLeft: 0, marginRight: 0, marginTop: 0, marginBottom: MB, style,
+  x: {...px, axis: null}, y: yb,
+  marks: [
+    Plot.rect([0], {x1: () => BX, x2: () => BX + BW, y1: () => -16, y2: () => BLOCKS[0][1], fill: v("--band")}),
+    Plot.text([0], {x: () => BX + BW / 2, y: () => -16, text: () => "not held by", lineAnchor: "top", dy: 2, fill: MUTED, fontSize: FS}),
+    Plot.text(Object.entries(COLS), {x: (d) => d[1], y: () => TOP, text: (d) => d[0] / 1000 + "k", lineAnchor: "bottom", dy: -1, fill: MUTED, fontSize: FS}),
+    Plot.ruleY(rows, {y: "y", x1: () => MLc, x2: () => MLc + HW, stroke: RULE, strokeWidth: 0.6}),
+    Plot.dot(runs, {x: "x", y: "y", r: 3, fill: (d) => col(d.r.c), stroke: "white", strokeWidth: 0.75}),
+    // x axis of the held region
+    Plot.ruleX([1000, 2000, 3000], {x: xu, y1: () => HB, y2: () => HB + 3, stroke: MUTED, strokeWidth: 1}),
+    Plot.text([1000, 2000, 3000], {x: xu, y: () => HB + 9, text: (d) => d / 1000 + "k", lineAnchor: "top", fill: MUTED, fontSize: FS}),
+    Plot.text([0], {x: () => MLc + PW / 2, y: () => HB + LO, text: () => "PPO updates", lineAnchor: "bottom", fill: MUTED, fontSize: FS}),
+  ],
+}));
+</script>
+</body></html>

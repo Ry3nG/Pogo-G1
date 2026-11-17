@@ -1,0 +1,10 @@
+# Dose and delay of the timescale.
+step-gain 0 steer_timescale="step" yaw_weight=6.8
+window-tau0.1 0 steer_timescale="window" steer_tau=0.1
+window-tau2 0 steer_timescale="window" steer_tau=2.0
+step-gain 1 steer_timescale="step" yaw_weight=6.8
+window-tau0.1 1 steer_timescale="window" steer_tau=0.1
+window-tau2 1 steer_timescale="window" steer_tau=2.0
+step-gain 2 steer_timescale="step" yaw_weight=6.8
+window-tau0.1 2 steer_timescale="window" steer_tau=0.1
+window-tau2 2 steer_timescale="window" steer_tau=2.0

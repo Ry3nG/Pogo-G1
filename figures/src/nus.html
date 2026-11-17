@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD--></head>
+<body>
+<!-- built at its printed width: placed at 0.44 textwidth = 265 px, so 12 px text prints at 9 pt -->
+<div class="fig" data-size="265x146" style="width:265px;height:146px">
+  <div id="p"></div>
+</div>
+<script>
+/*DATA*/
+const css = getComputedStyle(document.documentElement);
+const v = (k) => css.getPropertyValue(k).trim();
+const FS = 12;
+const style = {fontFamily: "Source Sans 3", fontSize: FS + "px", color: v("--muted"), overflow: "visible"};
+// path strokes (pen down) and one seed's hopped path, in metres, same frame
+const strokes = DATA.path.flatMap((st, k) => st.map(([x, y]) => ({x, y, k})));
+// one seed, the middle of the three by median distance from the path (seed 1, holding its heading)
+const trails = DATA.seeds[1].flatMap((seg, j) => seg.map(([x, y]) => ({x, y, z: j})));
+const all = [...strokes, ...trails], ext = (a, p) => [Math.min(...a) - p, Math.max(...a) + p];
+const X = ext(all.map((d) => d.x), 0.12), Y = ext(all.map((d) => d.y), 0.12);
+const W = 265, Hgt = 146, ML = 2, MR = 2, MT = 2, MB = 26;   // bottom margin holds the scale bar
+const k = Math.min((W - ML - MR) / (X[1] - X[0]), (Hgt - MT - MB) / (Y[1] - Y[0]));   // equal scale, px per metre
+const xd = [X[0], X[0] + (W - ML - MR) / k], yd = [Y[1] - (Hgt - MT - MB) / k, Y[1]];
+const yb = yd[0] - 14 / k;                     // scale bar baseline, below the letters
+document.getElementById("p").append(Plot.plot({
+  width: W, height: Hgt, marginLeft: ML, marginRight: MR, marginTop: MT, marginBottom: MB, style,
+  x: {domain: xd, axis: null}, y: {domain: yd, axis: null, clamp: false},
+  marks: [
+    Plot.line(strokes, {x: "x", y: "y", z: "k", stroke: "#c9ccd2", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round"}),
+    Plot.line(trails, {x: "x", y: "y", z: "z", stroke: v("--per-hop"), strokeWidth: 1.3, curve: "catmull-rom"}),
+    Plot.dot(DATA.path.map((st) => st[0]), {x: (d) => d[0], y: (d) => d[1], r: 2.6, fill: v("--ink")}),
+    Plot.link([0], {x1: () => X[0] + 0.12, x2: () => X[0] + 1.12, y1: () => yb, y2: () => yb, stroke: v("--ink"), strokeWidth: 1.5}),
+    Plot.text([0], {x: () => X[0] + 1.12, y: () => yb, text: () => "1 m", textAnchor: "start", dx: 5, fill: v("--ink"), fontSize: FS}),
+  ],
+}));
+</script>
+</body></html>

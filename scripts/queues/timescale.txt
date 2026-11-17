@@ -1,0 +1,5 @@
+# Reward-timescale experiment: steering scored per step.
+# The per-hop side is the baseline recipe (vel-obs seeds 0, 1, 2).
+step-steer 0 steer_timescale="step"
+step-steer 1 steer_timescale="step"
+step-steer 2 steer_timescale="step"

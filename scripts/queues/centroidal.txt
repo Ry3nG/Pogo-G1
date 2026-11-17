@@ -1,0 +1,4 @@
+# Per-step steering on the momentum-based yaw rate L_z/I_zz.
+centroidal 0 steer_timescale="centroidal"
+centroidal 1 steer_timescale="centroidal"
+centroidal 2 steer_timescale="centroidal"

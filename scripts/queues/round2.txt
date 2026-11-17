@@ -1,0 +1,11 @@
+# Second round: averaged steering, potential-based height
+# guide, and the observability ablation (no velocity input).
+window-steer 0 steer_timescale="window"
+window-steer 1 steer_timescale="window"
+window-steer 2 steer_timescale="window"
+pbrs-height 0 height_guide="potential"
+pbrs-height 1 height_guide="potential"
+pbrs-height 2 height_guide="potential"
+novel 0 base_velocity=False
+novel 1 base_velocity=False
+novel 2 base_velocity=False

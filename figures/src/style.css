@@ -1,0 +1,42 @@
+/* Design system for every report and slide figure.
+   Figures are drawn at the report's text width (A4, 1-inch margins:
+   6.27 in = 602 CSS px) and placed at 100 %, so 12 px = 9 pt. */
+:root {
+  --ink: #1d2433;        /* titles, values */
+  --text: #3d4452;       /* labels */
+  --muted: #6b7280;      /* ticks, secondary text */
+  --rule: #e5e7eb;       /* gridlines */
+  --band: #eaecef;       /* neutral regions: stance, "not held", within tolerance */
+  --target: #dcdee2;     /* command +- tolerance band on a rate axis (ink at about 16 %) */
+  /* one colour per condition, everywhere in the report. These four hues encode only the
+     reward condition or the signal it scores; nothing else may use them or a near hue. */
+  --per-hop: #2a78d6;
+  --per-step: #eb6834;
+  --window: #1baf7a;
+  --momentum: #6250d6;
+  --neutral: #9aa0a6;
+  /* lines: solid ink 0.8 = the command; dashed ink 0.8 (3,3) = a threshold (tolerance,
+     needed factor); no data series is dashed. Text is never below 12 px (9 pt printed). */
+}
+@page { margin: 0; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body {
+  font-family: "Source Sans 3", sans-serif;
+  font-size: 12px; line-height: 1.25; color: var(--text);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.fig { box-sizing: border-box; width: 602px; overflow: hidden; }
+.row { display: grid; column-gap: 22px; align-items: start; }
+.panel h2 {
+  margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--ink);
+  letter-spacing: 0.005em;
+}
+.panel h2 b { font-weight: 600; margin-right: 6px; }
+.panel h2 span { font-weight: 400; color: var(--muted); }
+.legend { display: flex; gap: 14px; white-space: nowrap; margin: 0 0 8px; font-size: 12px; color: var(--text); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px;
+  vertical-align: middle; margin-right: 6px; }
+.math { font-family: "LM Roman", serif; font-style: italic; font-weight: 400; }
+.mathrm { font-family: "LM Roman", serif; }
+svg { overflow: visible; }
+svg text { font-family: "Source Sans 3", sans-serif; }

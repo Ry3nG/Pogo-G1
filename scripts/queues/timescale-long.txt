@@ -1,0 +1,4 @@
+# Experiment 2 follow-up: is per-step steering slower, or stuck?
+# Run with UPDATES=12000.
+step-steer-long 0 steer_timescale="step"
+step-steer-long 1 steer_timescale="step"

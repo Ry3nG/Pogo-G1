@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD-->
+<style>
+  .cap { display: grid; grid-template-columns: 56px repeat(4, 126px); column-gap: 8px; align-items: end; }
+  .grp { display: grid; grid-template-columns: repeat(4, 30px); gap: 2px; }
+  .head { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .tol { font-size: 12px; color: var(--muted); white-space: nowrap; margin-bottom: 3px; }
+  .col { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 2px; }
+  .cell { height: 24px; border-radius: 2px; display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .rowlab { height: 24px; margin-bottom: 2px; display: flex; align-items: center; justify-content: flex-end; font-size: 12px; color: var(--muted); }
+  .hh { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; margin-bottom: 2px; }
+  .key { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 7px; white-space: nowrap; }
+  .key i { display: inline-block; width: 22px; height: 11px; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+</style></head>
+<body>
+<div class="fig" data-size="602x204" style="height:204px">
+  <div class="cap" id="cap"></div>
+  <div class="key" id="key"></div>
+</div>
+<script>
+/*DATA*/
+// Each cell is the worst of the three runs (DATA.aggregation). A metric is shaded against its task tolerance:
+// inside it a light neutral ramp (0 to 1x), beyond it a darker one from just past 1x to 4.5x; the ratio is taken
+// on the printed value, so equal printed values always share a shade.
+const cells = DATA.cells;
+const H = [...new Set(cells.map((c) => c.height))].sort((a, b) => a - b);
+const C = ["in_place", "forward", "turn", "forward_turn"], CL = ["I", "F", "T", "FT"];
+const pct = (x) => (x * 100 >= 99.95 ? "100" : (x * 100).toFixed(1));
+const M = [
+  {key: "success", name: "Success (%)", tol: "tolerance ≥ 95", f: pct, ratio: (s) => (100 - +s) / 5},
+  {key: "apex_err", name: "Height error (cm)", tol: "tolerance 3", f: (x) => (x * 100).toFixed(1), ratio: (s) => +s / 3},
+  {key: "planar_err", name: "Planar error (m/s)", tol: "tolerance 0.15", f: (x) => x.toFixed(2), ratio: (s) => +s / 0.15},
+  {key: "yaw_err", name: "Yaw error (rad/s)", tol: "tolerance 0.15", f: (x) => x.toFixed(2), ratio: (s) => +s / 0.15},
+];
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const [p, q] = [hex(a), hex(b)]; return `rgb(${p.map((x, i) => Math.round(x + (q[i] - x) * t)).join(",")})`; };
+const IN = ["#f6f7f8", "#e8eaed"], OUT = ["#c9cdd3", "#4b5563"], RMAX = 4.5;
+const fill = (r) => r <= 1 ? [mix(...IN, Math.max(r, 0)), "var(--ink)"]
+  : (() => { const t = Math.min((r - 1) / (RMAX - 1), 1); return [mix(...OUT, t), t > 0.45 ? "white" : "var(--ink)"]; })();
+let h = `<div></div>` + M.map((m) => `<div class="head">${m.name}</div>`).join("");
+h += `<div></div>` + M.map((m) => `<div class="tol">${m.tol}</div>`).join("");
+h += `<div class="hh">hop height</div>` + M.map(() => `<div class="grp">${CL.map((c) => `<div class="col">${c}</div>`).join("")}</div>`).join("");
+h += `<div style="align-self:start">${H.map((ht) => `<div class="rowlab">${ht.toFixed(2)} m</div>`).join("")}</div>`;
+for (const m of M) {
+  h += `<div class="grp" style="align-self:start">` + H.flatMap((ht) => C.map((c) => {
+    const s = m.f(cells.find((d) => d.height === ht && d.command === c)[m.key]), [bg, fg] = fill(m.ratio(s));
+    return `<div class="cell" style="background:${bg};color:${fg}">${s}</div>`;
+  })).join("") + `</div>`;
+}
+document.getElementById("cap").innerHTML = h;
+document.getElementById("key").innerHTML = `<span><i style="background:linear-gradient(90deg,${IN[0]},${IN[1]})"></i>within tolerance</span>
+  <span><i style="background:linear-gradient(90deg,${OUT[0]},${OUT[1]})"></i>1× to ${RMAX}× the tolerance</span>
+  <span>I in place · F forward 0.3 m/s · T turning 0.5 rad/s · FT both</span>`;
+</script>
+</body></html>

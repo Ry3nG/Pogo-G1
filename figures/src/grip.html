@@ -1,0 +1,96 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD-->
+<style>
+  .frames { display: grid; grid-template-columns: 124px 124px; column-gap: 8px; }
+  .name { font-size: 12px; font-weight: 600; color: var(--ink); text-align: center; white-space: nowrap; height: 16px; }
+  .crop { position: relative; width: 116px; height: 151px; overflow: hidden; margin: 0 auto; }
+  .crop img { position: absolute; display: block; }
+  .crop svg { position: absolute; left: 0; top: 0; overflow: visible; }
+  .out { font-size: 12px; color: var(--ink); text-align: center; margin-top: 2px; }
+</style></head>
+<body>
+<div class="fig" data-size="602x206" style="height:206px">
+  <div class="row" style="grid-template-columns: 256px 144px 174px; column-gap: 14px">
+    <div class="panel"><h2><b>a</b>Tested at half finger strength <span>· <i>t</i> = 0.48 s</span></h2>
+      <div class="frames">
+        <div><div class="name">trained at full strength</div><div class="crop" id="f1"></div><div class="out">loses grip</div></div>
+        <div><div class="name">trained at half strength</div><div class="crop" id="f2"></div><div class="out">keeps grip</div></div>
+      </div>
+    </div>
+    <div class="panel"><h2><b>b</b>Margin by hop height</h2><div id="b"></div></div>
+    <div class="panel"><h2><b>c</b>Training with weaker fingers</h2><div id="c"></div></div>
+  </div>
+</div>
+<script>
+/*DATA*/
+/*IMAGES*/
+const css = getComputedStyle(document.documentElement);
+const v = (k) => css.getPropertyValue(k).trim();
+const FS = 12;
+const style = {fontFamily: "Source Sans 3", fontSize: FS + "px", color: v("--muted"), overflow: "visible"};
+const INK = v("--ink"), MUTED = v("--muted");
+const LO = 34, MB = 40;
+const axisX = (o) => ({labelAnchor: "center", labelArrow: "none", labelOffset: LO, tickSize: 3, ...o});
+
+// a: the two frames at t = 0.48 s, one crop box (source px) from head to knees, the same for both renders;
+// a thin ring marks hands and handle
+const BOX = {x: 25, y: 135, w: 280}, S = 116 / BOX.w;
+const RING = {"grip-slip-2": [168, 292, 64], "grip-hold-2": [150, 340, 64]};   // centre x, y and radius (source px)
+[["f1", "grip-slip-2"], ["f2", "grip-hold-2"]].forEach(([id, k]) => {
+  const el = document.getElementById(id), [cx, cy, r] = RING[k];
+  el.innerHTML = `<img src="${IMAGES[k]}" style="width:${323 * S}px; left:${-BOX.x * S}px; top:${-BOX.y * S}px">
+    <svg width="116" height="151"><circle cx="${(cx - BOX.x) * S}" cy="${(cy - BOX.y) * S}" r="${r * S}" fill="none"
+    stroke="${INK}" stroke-width="1"/></svg>`;
+});
+
+const NEED = DATA.needed;   // factor a rated hand may need under the contact-model uncertainty
+const H = 206 - 20;
+const need = (x2, below) => [
+  Plot.ruleY([NEED], {stroke: INK, strokeWidth: 0.8, strokeDasharray: "3,3"}),
+  Plot.text([0], {x: () => x2, y: () => NEED, text: () => NEED + "× needed", textAnchor: "end",
+    lineAnchor: below ? "top" : "bottom", dy: below ? 3 : -3, fill: INK, fontSize: FS}),
+];
+
+// b: safety factor (1 / weakest hand that still succeeds) against hop height, the three trained policies (4000 updates)
+const pts = DATA.trained.filter((t) => t.updates === 4000).flatMap((t) =>
+  Object.entries(t.factor).map(([h, f]) => ({h: +h, f, seed: t.seed})));
+document.getElementById("b").append(Plot.plot({
+  width: 144, height: H, marginLeft: 32, marginRight: 6, marginTop: 20, marginBottom: MB, style,
+  x: axisX({domain: [0.1, 1.05], label: "hop height (m)", ticks: [0.15, 0.3, 0.5, 0.75, 1], tickFormat: (d) => d === 0.3 ? "" : String(d)}),
+  y: {domain: [1, 2.05], label: null, ticks: [1, 1.5, 2], tickFormat: (d) => d + "×", tickSize: 0, grid: true},
+  marks: [
+    ...need(1.05, false),
+    Plot.line(pts, {x: "h", y: "f", z: "seed", stroke: INK, strokeWidth: 1.2, strokeOpacity: 0.55}),
+    Plot.dot(pts, {x: "h", y: "f", r: 3, fill: INK, stroke: "white", strokeWidth: 0.75}),
+    Plot.text([0], {x: () => 0.1, y: () => 2.05, text: () => "safety factor", textAnchor: "start", lineAnchor: "bottom", dx: -30, dy: -6, fill: MUTED, fontSize: FS}),
+  ],
+}));
+
+// c: lowest factor over 0.15, 0.5 and 1.0 m after 2000 further updates at training finger strength s
+// (s = 1 is the full-strength control); runs at one strength sit side by side
+const ST = [1.0, 0.7, 0.5, 0.35], HS = ["0.15", "0.5", "1.0"];
+const runs = DATA.sweep.map((r) => ({s: r.strength, f: Math.min(...HS.map((h) => r.factor[h]))}));
+runs.forEach((r) => {
+  const same = runs.filter((q) => q.s === r.s);
+  r.x = ST.indexOf(r.s) + (same.indexOf(r) - (same.length - 1) / 2) * 0.24;
+  r.single = same.length === 1;
+});
+document.getElementById("c").append(Plot.plot({
+  width: 174, height: H, marginLeft: 26, marginRight: 6, marginTop: 20, marginBottom: MB, style,
+  x: axisX({domain: [-0.7, 3.4], label: "finger strength in training", ticks: [0, 1, 2, 3], tickFormat: (i) => String(ST[i])}),
+  y: {domain: [0.8, 4.4], label: null, ticks: [1, 2, 3, 4], tickFormat: (d) => d + "×", tickSize: 0, grid: true},
+  marks: [
+    ...need(3.4, true),
+    Plot.dot(runs, {x: "x", y: "f", r: 3, fill: INK, stroke: "white", strokeWidth: 0.75}),
+    // single runs carry their value; the control is named under its runs
+    // value labels: above a dot that sits near the dashed line, to the left otherwise
+    ...[true, false].map((near) => Plot.text(runs.filter((r) => r.single && (Math.abs(r.f - NEED) < 0.5) === near),
+      {x: "x", y: "f", text: (d) => d.f.toFixed(2).replace(/0$/, "") + "×", fill: INK, fontSize: FS,
+       ...(near ? {lineAnchor: "bottom", dy: -6} : {textAnchor: "end", dx: -7})})),
+    Plot.text([0], {x: () => Math.max(...runs.filter((r) => r.s === 1).map((r) => r.x)), y: () => 1.2, text: () => "control",
+      textAnchor: "start", dx: 7, fill: MUTED, fontSize: FS}),
+    Plot.text([0], {x: () => -0.7, y: () => 4.4, text: () => "lowest safety factor", textAnchor: "start", lineAnchor: "bottom", dx: -24, dy: -6, fill: MUTED, fontSize: FS}),
+  ],
+}));
+</script>
+</body></html>

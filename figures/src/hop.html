@@ -1,0 +1,176 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><!--HEAD-->
+<style>
+  /* hero: the render's 2000 x 3000 canvas, cropped and scaled so its ground lies on b's time axis */
+  .hero { position: relative; overflow: hidden; }
+  .hero img { position: absolute; display: block; }
+  .hero svg { position: absolute; left: 0; top: 0; }
+  /* hop frames share one canvas (462 x 1200); rows 60-1150 hold every frame and its shadow */
+  .strip { position: relative; overflow: hidden; }
+  .strip img { position: absolute; transform: translateX(-50%); }
+  .strip .band { position: absolute; top: 0; bottom: 0; background: var(--band); }
+  .strip .phase { position: absolute; top: 1px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+</style></head>
+<body>
+<div class="fig" data-size="602x244" style="height:244px">
+  <div class="row" style="grid-template-columns: 104px 300px 154px">
+    <div class="panel">
+      <h2><b>a</b>Rider at apex</h2>
+      <div class="hero" id="hero"><img id="heroimg"></div>
+    </div>
+    <div class="panel">
+      <h2><b>b</b>One hop</h2>
+      <div class="strip" id="strip"></div>
+      <div id="plot"></div>
+    </div>
+    <div class="panel">
+      <h2><b>c</b>Turn error</h2>
+      <div id="learn"></div>
+    </div>
+  </div>
+</div>
+<script>
+/*DATA*/
+/*IMAGES*/
+const css = getComputedStyle(document.documentElement);
+const v = (k) => css.getPropertyValue(k).trim();
+const FS = 12;
+const style = {fontFamily: "Source Sans 3", fontSize: FS + "px", color: v("--muted"), overflow: "visible"};
+// no stroked halos: Chrome prints stroked text as Type 3 glyphs
+const BODY = 220, MB = 42;  // panel height below its title; bottom margin (ticks + axis title)
+const BASE = BODY - MB;     // the time axis of b and c, and the ground of a, sit here
+const GROUND = v("--neutral");
+
+// Lighten the renders' contact shadows to half their opacity (rows below `from`, partly transparent pixels only).
+const soften = (src, from, done) => {
+  const im = new Image();
+  im.onload = () => {
+    const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height;
+    const g = cv.getContext("2d"); g.drawImage(im, 0, 0);
+    const px = g.getImageData(0, 0, cv.width, cv.height), d = px.data;
+    for (let y = Math.floor(from * cv.height); y < cv.height; y++)
+      for (let x = 0; x < cv.width; x++) { const i = 4 * (y * cv.width + x) + 3; if (d[i] < 235) d[i] = Math.round(d[i] * 0.5); }
+    g.putImageData(px, 0, 0); done(cv.toDataURL("image/png"));
+  };
+  im.src = src;
+};
+
+// a: the hero render. Measured on the render: tip at y = 2213 and 0.5 m of height = 619 px (from the stick's
+// pedal-to-tip length, 0.452 m in the hop frames), so the ground is at y = 2832; the rider's head is at y = 180.
+{
+  const W = 104, top = 2, src = {head: 180, tip: 2213, ground: 2832, stick: 985, hand: [1015, 735], shaft: 1935};
+  const k = (BASE - top) / (src.ground - src.head), x0 = src.stick - 27 / k;
+  const X = (x) => (x - x0) * k, Y = (y) => top + (y - src.head) * k;
+  const hero = document.getElementById("hero"), img = document.getElementById("heroimg");
+  Object.assign(hero.style, {width: W + "px", height: BODY + "px"});
+  Object.assign(img.style, {width: 2000 * k + "px", height: 3000 * k + "px", left: X(0) + "px", top: Y(0) + "px"});
+  soften(IMAGES.hero, 0.8, (u) => { img.src = u; });
+  const ns = "http://www.w3.org/2000/svg", el = (n, a, parent) => {
+    const e = document.createElementNS(ns, n); for (const [p, q] of Object.entries(a)) e.setAttribute(p, q);
+    (parent || svg).append(e); return e; };
+  const svg = el("svg", {width: W, height: BODY}, hero);
+  const ink = v("--ink"), muted = v("--muted");
+  el("line", {x1: 0, x2: W, y1: BASE, y2: BASE, stroke: GROUND, "stroke-width": 1});
+  const text = (x, y, lines, anchor = "start") => {
+    const t = el("text", {x, y, "font-size": FS, fill: v("--text"), "text-anchor": anchor});
+    lines.forEach((s, i) => { const sp = el("tspan", {x, dy: i ? 14 : 0}, t); sp.textContent = s; });
+  };
+  const lead = (x1, y1, x2, y2) => { el("line", {x1, y1, x2, y2, stroke: muted, "stroke-width": 0.8});
+    el("circle", {cx: x2, cy: y2, r: 1.4, fill: muted}); };
+  // callouts
+  const [hx, hy] = [X(src.hand[0]), Y(src.hand[1])];
+  text(49, hy - 6, ["hands grip", "by friction"]); lead(47, hy - 10, hx + 2, hy);
+  const sy = Y(src.shaft);
+  text(49, sy - 2, ["pneumatic", "spring"]); lead(47, sy - 6, X(src.stick) + 3, sy - 6);
+  // tip height above the ground: a dimension line with end bars
+  const dx = X(src.stick) + 11, y1 = Y(src.tip), y2 = BASE;
+  el("line", {x1: dx, x2: dx, y1, y2, stroke: ink, "stroke-width": 0.8});
+  [y1, y2].forEach((y) => el("line", {x1: dx - 3, x2: dx + 3, y1: y, y2: y, stroke: ink, "stroke-width": 0.8}));
+  text(dx + 5, (y1 + y2) / 2 + 4, ["0.5 m"]);
+}
+
+// b: frames above the plot, on the plot's time axis
+const c = DATA.cycle, t0 = c.t_s[0];
+const rows = c.t_s.map((t, i) => ({t: t - t0, tip: c.tip_height_m[i], comp: c.compression_m[i], contact: c.tip_contact[i]}));
+const T = rows.at(-1).t;
+const order = ["touchdown", "compressed", "takeoff", "rising", "apex", "landing"];
+const frames = order.map((k) => ({k, t: DATA.frames[k].t_s - t0}));
+const stance = [];
+rows.forEach((r, i) => {
+  if (r.contact && (i === 0 || !rows[i - 1].contact)) stance.push({x1: r.t});
+  if (!r.contact && i > 0 && rows[i - 1].contact) stance.at(-1).x2 = r.t;
+});
+if (stance.length && stance.at(-1).x2 === undefined) stance.at(-1).x2 = T;
+const takeoff = stance[0].x2;
+
+const W = 300, ML = 30, MR = 8, HS = 110, HP = BODY - HS;
+const x = (t) => ML + (t / T) * (W - ML - MR);
+const strip = document.getElementById("strip");
+strip.style.height = HS + "px";
+const crop = {y0: 60, y1: 1150, w: 462, h: 1200}, kf = HS / (crop.y1 - crop.y0);
+stance.forEach((s) => {
+  const b = document.createElement("div"); b.className = "band";
+  Object.assign(b.style, {left: x(s.x1) + "px", width: x(s.x2) - x(s.x1) + "px"});
+  strip.append(b);
+});
+frames.forEach((f, i) => {
+  const img = document.createElement("img");
+  Object.assign(img.style, {left: x(f.t) + "px", top: -crop.y0 * kf + "px", width: crop.w * kf + "px", height: crop.h * kf + "px"});
+  soften(IMAGES[`hop-${i + 1}`], 0.9, (u) => { img.src = u; });
+  strip.append(img);
+});
+[["stance", 0], ["flight", takeoff]].forEach(([name, t]) => {
+  const s = document.createElement("span"); s.className = "phase"; s.textContent = name;
+  s.style.left = x(t) + 3 + "px"; strip.append(s);
+});
+// each curve only where it is not identically zero: compression in stance, tip height in flight
+const inStance = (r) => r.t <= takeoff + 1e-9, inFlight = (r) => r.t >= takeoff - 1e-9;
+document.getElementById("plot").append(Plot.plot({
+  width: W, height: HP, marginLeft: ML, marginRight: MR, marginTop: 0, marginBottom: MB, style,
+  x: {domain: [0, T], label: "time (s)", labelAnchor: "center", labelArrow: "none", labelOffset: 36,
+      ticks: [0, 0.2, 0.4, 0.6, 0.8], tickFormat: (d) => d ? String(d) : "0", tickSize: 3},
+  y: {domain: [0, 0.55], label: null, ticks: [0, 0.25, 0.5], tickFormat: (d) => d === 0.5 ? "0.5 m" : d ? String(d) : "0", tickSize: 0},
+  marks: [
+    Plot.rect(stance, {x1: "x1", x2: "x2", y1: 0, y2: 0.55, fill: v("--band")}),
+    Plot.ruleY([0.25, 0.5], {stroke: v("--rule"), strokeWidth: 0.8}),
+    Plot.ruleX(frames, {x: "t", y1: 0.51, y2: 0.55, stroke: v("--neutral"), strokeWidth: 1}),  // each frame's instant
+    Plot.areaY(rows.filter(inStance), {x: "t", y: (d) => Math.max(d.comp, 0), fill: v("--muted"), fillOpacity: 0.25}),
+    Plot.line(rows.filter(inStance), {x: "t", y: (d) => Math.max(d.comp, 0), stroke: v("--muted"), strokeWidth: 1}),
+    Plot.ruleY([0], {stroke: GROUND, strokeWidth: 1}),
+    Plot.line(rows.filter(inFlight), {x: "t", y: (d) => Math.max(d.tip, 0), stroke: v("--ink"), strokeWidth: 1.8}),
+    Plot.text([0], {x: 0.79, y: 0.42, text: () => "tip height", textAnchor: "start", dx: 2, fill: v("--ink"), fontSize: FS}),
+    Plot.text([0], {x: takeoff / 2, y: 0.29, text: () => "spring\ncompression", textAnchor: "middle", lineAnchor: "bottom", dy: -3,
+      lineHeight: 1.1, fill: v("--text"), fontSize: FS}),
+  ],
+}));
+
+// c: hop-averaged yaw error at +-0.5 rad/s during training, per step against per hop (same encoding as Fig. learning a)
+const COLC = {"per hop": v("--per-hop"), "per step": v("--per-step")};
+const L = DATA.learning;
+const meanC = Object.keys(COLC).flatMap((cn) => {
+  const rs = L.filter((r) => r.condition === cn);
+  return [...new Set(rs.map((r) => r.iter))].sort((a, b) => a - b).map((it) => {
+    const ys = rs.filter((r) => r.iter === it).map((r) => r.yaw);
+    return {condition: cn, iter: it, yaw: ys.reduce((a, b) => a + b, 0) / ys.length};
+  });
+});
+const lab = (x, y, s, fill, o = {}) => Plot.text([0], {x, y, text: () => s, fill, fontSize: FS, ...o});
+document.getElementById("learn").append(Plot.plot({
+  width: 154, height: BODY, marginLeft: 32, marginRight: 8, marginTop: 18, marginBottom: MB, style,
+  x: {domain: [500, 4000], label: "PPO updates", labelAnchor: "center", labelArrow: "none", labelOffset: 36,
+      ticks: [1000, 2000, 3000, 4000], tickFormat: (d) => d / 1000 + "k", tickSize: 3},
+  y: {domain: [0, 0.66], label: null, ticks: [0, 0.15, 0.3, 0.45, 0.6], tickFormat: (d) => d ? d.toFixed(2) : "0", tickSize: 0, grid: true},
+  marks: [
+    Plot.ruleY([0.5], {stroke: v("--neutral"), strokeWidth: 0.8}),
+    Plot.ruleY([0.15], {stroke: v("--ink"), strokeWidth: 0.8, strokeDasharray: "3,3"}),
+    Plot.line(L, {x: "iter", y: "yaw", z: (d) => d.condition + d.seed, stroke: (d) => COLC[d.condition], strokeWidth: 1, strokeOpacity: 0.35}),
+    Plot.line(meanC, {x: "iter", y: "yaw", z: "condition", stroke: (d) => COLC[d.condition], strokeWidth: 1.8}),
+    lab(4000, 0.5, "no turn", v("--muted"), {textAnchor: "end", lineAnchor: "bottom", dy: -2}),
+    lab(4000, 0.15, "tolerance", v("--ink"), {textAnchor: "end", lineAnchor: "bottom", dy: -3}),
+    lab(4000, 0.445, "per step", v("--per-step"), {textAnchor: "end", lineAnchor: "top", dy: 2, fontWeight: 600}),
+    lab(2250, 0.27, "per hop", v("--per-hop"), {textAnchor: "start", fontWeight: 600}),
+    Plot.text([0], {x: 500, y: 0.66, text: () => "yaw error (rad/s)", textAnchor: "start", lineAnchor: "bottom", dx: -30, dy: -4, fill: v("--muted"), fontSize: FS}),
+  ],
+}));
+</script>
+</body></html>
