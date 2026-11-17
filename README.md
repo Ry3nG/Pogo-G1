@@ -166,6 +166,18 @@ Two external assets stay outside git, under `data/`:
 Run commands from the repository root. Checkpoints, videos and evaluation
 results go to `artifacts/`, which is ignored.
 
+## Pretrained policies
+
+The three runs behind the results above, at 4000 updates, are on Hugging Face:
+[zrgong/pogo-g1-ppo](https://huggingface.co/zrgong/pogo-g1-ppo).
+
+```sh
+hf download zrgong/pogo-g1-ppo --local-dir artifacts/runs
+uv run --locked --extra train python scripts/play.py artifacts/runs/vel-obs-s0 \
+  --ckpt model_4000.pt --worlds 64 --seconds 20 \
+  --set 'apex=(0.5,0.5)' --set 'vx=(0.3,0.3)' --video
+```
+
 ## Train, play, evaluate
 
 ```sh
